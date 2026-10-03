@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:," />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Аркада-подарок</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    .hud { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; font-weight: 900; font-size: 22px; pointer-events: none; z-index: 5; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+    .combo { position: fixed; top: calc(52px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-family: "Press Start 2P", monospace; font-size: 14px; color: var(--accent2); z-index: 5; pointer-events: none; text-shadow: 3px 3px 0 #1a1030; }
+    .overlay { background: rgba(27, 16, 48, 0.88); z-index: 10; max-width: none; }
+    .overlay > * { max-width: 420px; }
+    .hint { font-size: 15px; }
+    .pair { display: flex; align-items: center; }
+    .pair .avatar { width: 110px; height: 110px; }
+    .pair .avatar + .avatar { margin-left: -24px; border-color: var(--accent); }
+    .comic { position: fixed; z-index: 7; transform: translate(-50%, -50%) rotate(var(--rot)); font-family: "Press Start 2P", monospace; pointer-events: none; white-space: nowrap; text-align: center;
+      text-shadow: 3px 3px 0 #1a1030, -2px -2px 0 #1a1030, 2px -2px 0 #1a1030, -2px 2px 0 #1a1030; animation: comic 1.3s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards; }
+    @keyframes comic { 0% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(0.2); opacity: 0; } 15% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1.25); opacity: 1; } 30% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1); } 80% { opacity: 1; } 100% { transform: translate(-50%, -110%) rotate(var(--rot)); opacity: 0; } }
+    .banner { position: fixed; left: 0; right: 0; top: 38%; z-index: 8; text-align: center; font-family: "Press Start 2P", monospace; font-size: clamp(16px, 5vw, 24px); line-height: 1.6; padding: 18px 10px; color: #fff; background: rgba(230, 57, 70, 0.92); box-shadow: 0 6px 0 #1a1030; pointer-events: none; animation: banner 2.2s ease-in-out forwards; }
+    .banner.good { background: rgba(6, 214, 160, 0.92); color: #1a1030; }
+    @keyframes banner { 0% { transform: translateX(-110%); } 15%, 80% { transform: none; } 100% { transform: translateX(110%); } }
+    .vignette { position: fixed; inset: 0; z-index: 4; pointer-events: none; box-shadow: inset 0 0 120px 40px rgba(255, 77, 141, 0.55); opacity: 0; transition: opacity 0.5s; }
+    .vignette.on { opacity: 1; }
+    .heart-rain { position: fixed; top: -40px; z-index: 6; pointer-events: none; animation: heartFall linear forwards; }
+    @keyframes heartFall { to { transform: translateY(115vh) rotate(25deg); } }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="vignette" id="vignette"></div>
+  <div class="hud hidden" id="hud"><span id="score">0</span><span id="lives"></span></div>
+  <div class="combo hidden" id="combo"></div>
+
+  <div id="start" class="screen center overlay">
+    <img class="avatar wobble" id="startPhoto" alt="" />
+    <h1 id="title"></h1>
+    <p>Лови всё хорошее, уворачивайся от плохого.<br />Поймаешь <b id="loveName"></b> — будет магия ✨<br />Набери <b id="goal"></b> очков!</p>
+    <p class="hint">Води пальцем по экрану (или стрелками ← →)</p>
+    <button class="btn pink" id="startBtn">Погнали!</button>
+  </div>
+
+  <div id="end" class="screen center overlay hidden">
+    <div class="pair" id="endPair"><img class="avatar" id="endPhoto" alt="" /><img class="avatar hidden" id="endFrom" alt="" /></div>
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <button class="btn pink" id="againBtn">Ещё раз</button>
+  </div>
+
+  <script src="../shared/engine.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const cv = $("c"), cx = cv.getContext("2d");
+    let W, H, DPR, G, face, faceFrom;
+    let state = "menu";
+    let P, items, parts, score, lives, combo, best, spawnT, speed, shake, lastT, slow, event, eventT, nextEvent, loveT;
+
+    const YUM = ["НЯМ!", "МОЁ!", "ЕЩЁ!", "ХРУМ!", "ВКУСНО!", "ЭТО МНЕ?!"];
+    const OUCH = ["АЙ!", "ЗА ЧТО?!", "НЕЕЕТ!", "НУ КАМОН!", "БОЛЬНО!"];
+    const COMBO_WORDS = { 5: "НЕПЛОХО!", 10: "ОГОНЬ! 🔥", 15: "ПЕЛЬМЕННЫЙ БОГ!", 20: "ЛЕГЕНДА!", 30: "НЕВОЗМОЖНО!!!" };
+
+    function resize() {
+      DPR = Math.min(devicePixelRatio || 1, 2);
+      W = innerWidth; H = innerHeight;
+      cv.width = W * DPR; cv.height = H * DPR;
+      cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    addEventListener("resize", resize);
+    resize();
+
+    Gift.loadOrder().then(async (cfg) => {
+      G = cfg;
+      [face, faceFrom] = await Promise.all([Gift.loadImage(G.hero.photo), Gift.loadImage(G.from.photo)]);
+      $("startPhoto").src = $("endPhoto").src = Gift.asset(G.hero.photo);
+      $("endFrom").src = Gift.asset(G.from.photo);
+      $("title").textContent = G.arcade.title;
+      $("goal").textContent = G.arcade.winScore;
+      $("loveName").textContent = G.from.name;
+      document.title = G.arcade.title;
+      requestAnimationFrame(loop);
+    }).catch((e) => Gift.showError(e.message));
+
+    function comic(text, x, y, color = "#ffd166", size = 1) {
+      const d = document.createElement("div");
+      d.className = "comic"; d.textContent = text;
+      d.style.left = x + "px"; d.style.top = y + "px"; d.style.color = color;
+      d.style.fontSize = Math.round(16 * size) + "px";
+      d.style.setProperty("--rot", (Math.random() - 0.5) * 20 + "deg");
+      document.body.appendChild(d);
+      setTimeout(() => d.remove(), 1300);
+    }
+    function banner(text, good) {
+      const b = document.createElement("div");
+      b.className = "banner" + (good ? " good" : ""); b.textContent = text;
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 2300);
+    }
+    function heartRain(n = 25) {
+      for (let k = 0; k < n; k++) setTimeout(() => {
+        const h = document.createElement("div");
+        h.className = "heart-rain"; h.textContent = ["❤️", "💖", "💕", "💗"][k % 4];
+        h.style.left = Math.random() * 100 + "vw"; h.style.fontSize = 16 + Math.random() * 20 + "px";
+        h.style.animationDuration = 2.5 + Math.random() * 2 + "s";
+        document.body.appendChild(h); setTimeout(() => h.remove(), 5000);
+      }, k * 60);
+    }
+
+    function reset() {
+      const r = Math.min(W, H) * 0.085 + 8;
+      P = { x: W / 2, y: H - r * 2.6 - 30, r, tx: W / 2, vx: 0, squash: 0, spin: 0, dizzy: 0, run: 0, dir: 1 };
+      items = []; parts = [];
+      score = 0; lives = 3; combo = 0; best = 0; spawnT = 0; speed = 1; shake = 0; slow = 0;
+      event = null; eventT = 0; nextEvent = 150; loveT = 6 + Math.random() * 6;
+      updateHud();
+    }
+    function updateHud() {
+      $("score").textContent = "⭐ " + score;
+      $("lives").textContent = "❤️".repeat(lives) + "🖤".repeat(3 - lives);
+      const mult = 1 + Math.floor(combo / 5);
+      $("combo").textContent = combo >= 3 ? "КОМБО " + combo + (mult > 1 ? "  x" + mult : "") : "";
+    }
+
+    function pointer(e) { if (state === "play") P.tx = e.touches ? e.touches[0].clientX : e.clientX; }
+    cv.addEventListener("pointermove", pointer);
+    cv.addEventListener("pointerdown", pointer);
+    cv.addEventListener("touchmove", (e) => { e.preventDefault(); pointer(e); }, { passive: false });
+    const keys = {};
+    addEventListener("keydown", (e) => (keys[e.key] = true));
+    addEventListener("keyup", (e) => (keys[e.key] = false));
+
+    function spawn(kind) {
+      const A = G.arcade;
+      let def, type;
+      if (kind === "love") { type = "love"; def = A.love || { points: 50, text: "ЛЮБОВЬ!" }; }
+      else if (kind === "golden" || (!kind && Math.random() < 0.025)) { type = "golden"; def = A.golden || { emoji: "🥟", points: 100, text: "ЗОЛОТО!" }; }
+      else {
+        let badChance = Math.min(0.42, 0.22 + speed * 0.04);
+        if (event === "monday") badChance = 0.8;
+        if (event === "friday") badChance = 0.05;
+        const bad = Math.random() < badChance;
+        type = bad ? "bad" : "good";
+        const pool = bad ? A.bad : A.good;
+        def = pool[Math.floor(Math.random() * pool.length)];
+      }
+      const fast = event === "monday" ? 1.35 : 1;
+      items.push({
+        ...def, type,
+        x: 30 + Math.random() * (W - 60), y: -50,
+        vy: (type === "love" ? 110 : type === "golden" ? 260 : 130 + Math.random() * 90) * speed * fast,
+        rot: 0, vr: type === "love" ? 0 : (Math.random() - 0.5) * 5,
+        size: type === "love" ? 64 : 42 + Math.random() * 10, t: 0,
+        wob: Math.random() * 6,
+      });
+    }
+
+    function puff(x, y, c = "rgba(255,255,255,0.5)") { parts.push({ x, y, vx: (Math.random() - 0.5) * 40, vy: -20 - Math.random() * 30, life: 0.5, max: 0.5, r: 6, c, grow: 22 }); }
+    function sparks(x, y, colors, n = 16, sp = 220) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, s = sp * (0.4 + Math.random() * 0.6); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60, life: 0.8, max: 0.8, r: 4, c: colors[i % colors.length], g: 500 }); } }
+    function heartsBurst(x, y) { for (let i = 0; i < 14; i++) { const a = (i / 14) * 6.28; parts.push({ x, y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160 - 40, life: 1.4, max: 1.4, emoji: "💖", size: 22, g: 120 }); } }
+
+    function loop(t) {
+      const real = Math.min(0.033, (t - (lastT || t)) / 1000);
+      lastT = t;
+      if (slow > 0) slow -= real;
+      const dt = real * (slow > 0 ? 0.4 : 1);
+      if (state === "play") update(dt, real);
+      draw(t / 1000);
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt, real) {
+      speed += dt * 0.022;
+      if (keys.ArrowLeft) P.tx -= 700 * dt;
+      if (keys.ArrowRight) P.tx += 700 * dt;
+      P.tx = Math.max(P.r, Math.min(W - P.r, P.tx));
+      const nx = P.x + (P.tx - P.x) * Math.min(1, dt * 14);
+      P.vx = (nx - P.x) / Math.max(dt, 0.001);
+      P.x = nx;
+      if (Math.abs(P.vx) > 30) { P.dir = Math.sign(P.vx); P.run += dt * Math.min(30, Math.abs(P.vx) / 25); }
+      if (Math.abs(P.vx) > 500 && Math.random() < 0.5) puff(P.x - P.dir * 20, P.y + P.r * 2.4);
+      P.squash *= 0.88; P.spin *= 0.9; shake *= 0.85;
+      if (P.dizzy > 0) P.dizzy -= dt;
+
+      // события
+      if (!event && score >= nextEvent) {
+        event = "monday"; eventT = 6; banner("😱 ПОНЕДЕЛЬНИК АТАКУЕТ!");
+        nextEvent += 250;
+      }
+      if (event) {
+        eventT -= dt;
+        if (eventT <= 0) {
+          if (event === "monday") { event = "friday"; eventT = 5; banner("🎉 ПЯТНИЦА! ХАЛЯВА!", true); }
+          else event = null;
+        }
+      }
+      loveT -= dt;
+      if (loveT <= 0) { spawn("love"); loveT = 10 + Math.random() * 8; }
+
+      spawnT -= dt;
+      if (spawnT <= 0) { spawn(); spawnT = Math.max(0.26, (event ? 0.45 : 0.85) - speed * 0.1); }
+
+      const headY = P.y;
+      for (const it of items) {
+        it.t += dt;
+        it.y += it.vy * dt;
+        it.rot += it.vr * dt;
+        if (it.type === "love") { it.x += Math.sin(it.t * 2 + it.wob) * 60 * dt; if (Math.random() < 0.4) parts.push({ x: it.x + (Math.random() - 0.5) * 40, y: it.y, vx: 0, vy: 20, life: 0.8, max: 0.8, emoji: "✨", size: 14 }); }
+        if (it.type === "golden" && Math.random() < 0.5) parts.push({ x: it.x, y: it.y, vx: (Math.random() - 0.5) * 30, vy: -10, life: 0.5, max: 0.5, r: 3, c: "#ffd166" });
+        const dx = it.x - P.x, dy = it.y - headY;
+        if (!it.dead && Math.hypot(dx, dy) < P.r + it.size * 0.45) {
+          it.dead = true;
+          const mult = 1 + Math.floor(combo / 5);
+          if (it.type === "bad") {
+            lives--; combo = 0; shake = 16; P.squash = -0.35; P.spin = (Math.random() < 0.5 ? -1 : 1) * 6.28; P.dizzy = 1.2;
+            Gift.sfx.bad();
+            comic(it.text, it.x, it.y - 30, "#ff7790", 0.8);
+            comic(OUCH[Math.floor(Math.random() * OUCH.length)], P.x, P.y - P.r - 50, "#fff", 1.2);
+            sparks(it.x, it.y, ["#ff4d6d", "#ffd166", "#fff"], 12, 200);
+            if (navigator.vibrate) navigator.vibrate(90);
+          } else if (it.type === "love") {
+            const pts = it.points * mult; score += pts; combo += 3;
+            slow = 2.5; P.squash = 0.4; P.spin = 6.28;
+            Gift.sfx.heartbeat(); setTimeout(() => Gift.sfx.heartbeat(), 700); Gift.sfx.win();
+            heartsBurst(P.x, P.y - P.r); heartRain(30);
+            comic("+" + pts + " " + it.text, W / 2, H * 0.35, "#ff8fab", 1.2);
+            $("vignette").classList.add("on"); setTimeout(() => $("vignette").classList.remove("on"), 2500);
+          } else {
+            combo++;
+            const pts = it.points * mult; score += pts;
+            P.squash = 0.3; if (it.points >= 15 || it.type === "golden") P.spin = 6.28;
+            Gift.sfx.good();
+            comic("+" + pts + " " + it.text, it.x, it.y - 30, it.type === "golden" ? "#ffd166" : "#fff3b0", it.type === "golden" ? 1.3 : 0.8);
+            sparks(it.x, it.y, it.type === "golden" ? ["#ffd166", "#fff"] : ["#06d6a0", "#ffd166", "#fff"], it.type === "golden" ? 30 : 10, 200);
+            if (it.type === "golden") { shake = 8; Gift.sfx.win(); }
+            if (COMBO_WORDS[combo]) { comic(COMBO_WORDS[combo], W / 2, H * 0.3, "#ffd166", 1.4); Gift.sfx.win(); }
+            else if (Math.random() < 0.3) comic(YUM[Math.floor(Math.random() * YUM.length)], P.x, P.y - P.r - 50, "#fff", 1);
+          }
+          best = Math.max(best, combo);
+          updateHud();
+        } else if (!it.dead && it.y > H + 40 && it.type !== "bad") {
+          it.dead = true;
+          if (it.type === "love") comic("ЭХ, УПУСТИЛ " + G.from.name.toUpperCase() + "!", W / 2, H * 0.4, "#ff8fab", 0.8);
+          else if (combo >= 5) comic("КОМБО СГОРЕЛО", W / 2, H * 0.3, "#aaa", 0.7);
+          if (it.type === "good") combo = 0;
+          updateHud();
+        }
+      }
+      items = items.filter((it) => !it.dead && it.y < H + 80);
+      for (const p of parts) { p.life -= dt; p.vy += (p.g || 0) * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.grow) p.r += p.grow * dt; }
+      parts = parts.filter((p) => p.life > 0);
+      $("combo").classList.toggle("hidden", combo < 3);
+
+      if (lives <= 0) end(false);
+      else if (score >= G.arcade.winScore) end(true);
+    }
+
+    // мультяшный Дима: тело, бегающие ноги, мельтешащие руки
+    function drawPlayer(time) {
+      const p = P, r = p.r;
+      const shirt = (G.hero.look && G.hero.look.shirt) || "#3a86ff";
+      const pants = "#5b62a8"; // светлее штанов из истории, чтобы ноги было видно на тёмном фоне
+      const running = Math.abs(p.vx) > 30;
+      const ph = p.run * 6;
+      const lean = Math.max(-0.35, Math.min(0.35, p.vx / 2500));
+      const bodyTop = p.y + r * 0.8, bodyH = r * 1.1, feetY = p.y + r * 2.5;
+      cx.save();
+      cx.translate(p.x, feetY);
+      cx.rotate(lean);
+      cx.translate(-p.x, -feetY);
+      // ноги
+      cx.strokeStyle = pants; cx.lineWidth = r * 0.32; cx.lineCap = "round";
+      const step = running ? Math.sin(ph) * r * 0.55 : Math.sin(time * 3) * r * 0.05;
+      const lift = running ? Math.abs(Math.cos(ph)) * r * 0.25 : 0;
+      cx.beginPath(); cx.moveTo(p.x - r * 0.2, bodyTop + bodyH); cx.lineTo(p.x - r * 0.2 + step, feetY - lift * (Math.sin(ph) > 0 ? 1 : 0)); cx.stroke();
+      cx.beginPath(); cx.moveTo(p.x + r * 0.2, bodyTop + bodyH); cx.lineTo(p.x + r * 0.2 - step, feetY - lift * (Math.sin(ph) < 0 ? 1 : 0)); cx.stroke();
+      cx.fillStyle = "#1a1030";
+      cx.beginPath(); cx.ellipse(p.x - r * 0.2 + step + p.dir * 4, feetY - lift * (Math.sin(ph) > 0 ? 1 : 0), r * 0.22, r * 0.12, 0, 0, 6.28); cx.fill();
+      cx.beginPath(); cx.ellipse(p.x + r * 0.2 - step + p.dir * 4, feetY - lift * (Math.sin(ph) < 0 ? 1 : 0), r * 0.22, r * 0.12, 0, 0, 6.28); cx.fill();
+      // руки
+      cx.strokeStyle = shirt; cx.lineWidth = r * 0.26;
+      const swing = running ? Math.sin(ph) * r * 0.7 : Math.sin(time * 2) * r * 0.1;
+      const panic = p.dizzy > 0 ? Math.sin(time * 30) * r * 0.6 : 0;
+      cx.beginPath(); cx.moveTo(p.x - r * 0.5, bodyTop + r * 0.2); cx.lineTo(p.x - r * 0.95 - swing * 0.3, bodyTop + r * 0.5 - swing - panic); cx.stroke();
+      cx.beginPath(); cx.moveTo(p.x + r * 0.5, bodyTop + r * 0.2); cx.lineTo(p.x + r * 0.95 + swing * 0.3, bodyTop + r * 0.5 + swing + panic); cx.stroke();
+      // тело
+      cx.fillStyle = shirt;
+      cx.beginPath(); cx.roundRect(p.x - r * 0.55, bodyTop, r * 1.1, bodyH, r * 0.3); cx.fill();
+      cx.restore();
+
+      // голова-фото со сквошем и кувырками
+      cx.save();
+      cx.translate(p.x + lean * r, p.y);
+      cx.rotate(p.spin);
+      cx.scale(1 + p.squash * 0.6, 1 - p.squash * 0.6);
+      cx.beginPath(); cx.arc(0, 0, r + 5, 0, 6.28); cx.fillStyle = "#ffd166"; cx.fill();
+      cx.beginPath(); cx.arc(0, 0, r, 0, 6.28); cx.clip();
+      if (face) cx.drawImage(face, -r, -r, r * 2, r * 2);
+      if (p.squash < -0.1) { cx.fillStyle = "rgba(255,0,60,0.35)"; cx.fillRect(-r, -r, r * 2, r * 2); }
+      cx.restore();
+      if (p.dizzy > 0) { cx.font = "18px serif"; cx.textAlign = "center"; for (let k = 0; k < 3; k++) { const a = time * 8 + k * 2.09; cx.fillText("⭐", p.x + Math.cos(a) * r * 1.1, p.y - r - 8 + Math.sin(a) * 6); } }
+      if (running && Math.abs(p.vx) > 600) { cx.strokeStyle = "rgba(255,255,255,0.35)"; cx.lineWidth = 3; for (let k = 0; k < 3; k++) { const yy = p.y + r * (0.4 + k * 0.6); cx.beginPath(); cx.moveTo(p.x - p.dir * (r + 10), yy); cx.lineTo(p.x - p.dir * (r + 40 + k * 10), yy); cx.stroke(); } }
+    }
+
+    function draw(time) {
+      cx.save();
+      cx.clearRect(0, 0, W, H);
+      if (shake > 0.5) cx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+      if (event === "monday") { cx.fillStyle = "rgba(120,0,20,0.18)"; cx.fillRect(0, 0, W, H); }
+      if (event === "friday") { cx.fillStyle = "rgba(0,180,120,0.12)"; cx.fillRect(0, 0, W, H); }
+      cx.fillStyle = "rgba(255,255,255,0.5)";
+      for (let i = 0; i < 50; i++) { const sx = (i * 97) % W, sy = (i * 53 + time * 30 * (1 + (i % 3)) * (slow > 0 ? 0.4 : 1)) % H; cx.fillRect(sx, sy, 2, 2); }
+
+      if (P) {
+        for (const it of items) {
+          cx.save();
+          cx.translate(it.x, it.y);
+          if (it.type === "love") {
+            const pulse = 1 + Math.sin(it.t * 6) * 0.06;
+            cx.scale(pulse, pulse);
+            cx.font = it.size * 1.5 + "px serif"; cx.textAlign = "center"; cx.textBaseline = "middle";
+            cx.fillText("❤️", 0, 4);
+            cx.beginPath(); cx.arc(0, -2, it.size * 0.32, 0, 6.28); cx.clip();
+            if (faceFrom) cx.drawImage(faceFrom, -it.size * 0.32, -2 - it.size * 0.32, it.size * 0.64, it.size * 0.64);
+          } else {
+            cx.rotate(it.rot);
+            if (it.type === "golden") { cx.shadowColor = "#ffd166"; cx.shadowBlur = 20; cx.filter = "sepia(1) saturate(4) brightness(1.2)"; }
+            cx.font = it.size + "px serif"; cx.textAlign = "center"; cx.textBaseline = "middle";
+            cx.fillText(it.emoji, 0, 0);
+          }
+          cx.restore();
+        }
+        drawPlayer(time);
+        for (const p of parts) {
+          cx.globalAlpha = Math.max(0, p.life / p.max);
+          if (p.emoji) { cx.font = p.size + "px serif"; cx.textAlign = "center"; cx.fillText(p.emoji, p.x, p.y); }
+          else { cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.r, 0, 6.28); cx.fill(); }
+          cx.globalAlpha = 1;
+        }
+      }
+      cx.restore();
+    }
+
+    function start() {
+      Gift.sfx.boing();
+      reset();
+      state = "play";
+      $("start").classList.add("hidden");
+      $("end").classList.add("hidden");
+      $("hud").classList.remove("hidden");
+    }
+
+    function end(win) {
+      state = "end";
+      $("hud").classList.add("hidden");
+      $("combo").classList.add("hidden");
+      $("end").classList.remove("hidden");
+      $("endFrom").classList.toggle("hidden", !win);
+      if (win) {
+        $("endTitle").textContent = "ПОБЕДА! 🏆";
+        $("endText").textContent = G.arcade.winText + " (Лучшее комбо: " + best + ")";
+        Gift.sfx.win();
+        Gift.confetti(140);
+        heartRain(40);
+      } else {
+        $("endTitle").textContent = G.hero.name + " устал 😴";
+        $("endText").textContent = "Понедельник и брокколи победили… в этот раз. Набрано " + score + " из " + G.arcade.winScore + ". Лучшее комбо: " + best + ". Ещё разок?";
+        Gift.sfx.wrong();
+      }
+    }
+
+    $("startBtn").onclick = start;
+    $("againBtn").onclick = start;
+  </script>
+</body>
+</html>

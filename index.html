@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:," />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b1d4f" />
+  <title>Игра-подарок про твоего человека</title>
+  <meta name="description" content="Персональная игра в подарок: квиз, аркада и пиксельный мультик про любимого человека." />
+  <link rel="stylesheet" href="shared/style.css" />
+  <style>
+    body { background: #2b1d4f; font-family: "Press Start 2P", monospace; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .menu {
+      position: fixed; left: 0; right: 0; top: 0; z-index: 5;
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      padding: calc(22px + env(safe-area-inset-top)) 16px 0;
+    }
+    .logo { font-size: clamp(15px, 4.6vw, 22px); line-height: 1.55; text-align: center; color: #fff; text-shadow: 3px 3px 0 #ff4d6d, 6px 6px 0 #1a1030; max-width: 460px; }
+    .logo span { color: #ffd166; }
+    .sub { font-size: clamp(9px, 2.6vw, 11px); line-height: 1.9; text-align: center; color: #ffe3ee; text-shadow: 2px 2px 0 #1a1030; max-width: 400px; }
+    .items { display: flex; flex-direction: column; gap: 12px; width: min(92vw, 420px); margin-top: 4px; }
+    .item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-decoration: none; color: #fff7ec;
+      background: rgba(26, 16, 48, 0.88); touch-action: manipulation;
+      box-shadow: 0 -4px 0 #fff, 0 4px 0 #fff, -4px 0 0 #fff, 4px 0 0 #fff, 0 -8px 0 #1a1030, 0 8px 0 #1a1030, -8px 0 0 #1a1030, 8px 0 0 #1a1030;
+      transition: transform 0.08s steps(2);
+    }
+    .item:active { transform: translateY(3px); }
+    .item .ico { font-size: 26px; width: 34px; text-align: center; flex: none; }
+    .item b { display: block; font-size: 12px; color: #ffd166; margin-bottom: 6px; }
+    .item small { display: block; font-size: 9px; line-height: 1.7; color: #e6dcff; }
+    .item .go { margin-left: auto; color: #ff4d6d; font-size: 14px; animation: blink 0.9s steps(2) infinite; }
+    .item.star { box-shadow: 0 -4px 0 #ffd166, 0 4px 0 #ffd166, -4px 0 0 #ffd166, 4px 0 0 #ffd166, 0 -8px 0 #1a1030, 0 8px 0 #1a1030, -8px 0 0 #1a1030, 8px 0 0 #1a1030; }
+    .badge { display: inline-block; margin-left: 6px; padding: 3px 5px; font-size: 7px; color: #1a1030; background: #ffd166; vertical-align: middle; }
+    .sound { position: fixed; left: 0; right: 0; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 5; text-align: center; font-size: 9px; line-height: 1.8; color: #fff; text-shadow: 2px 2px 0 #1a1030; animation: blink 1.6s steps(2) infinite; }
+    .comic { position: fixed; z-index: 7; transform: translate(-50%, -50%) rotate(var(--rot)); font-family: "Press Start 2P", monospace; pointer-events: none; white-space: nowrap;
+      text-shadow: 3px 3px 0 #1a1030, -2px -2px 0 #1a1030, 2px -2px 0 #1a1030, -2px 2px 0 #1a1030; animation: comic 1.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards; }
+    @keyframes comic { 0% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(0.2); opacity: 0; } 15% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1.25); opacity: 1; } 30% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1); } 80% { opacity: 1; } 100% { transform: translate(-50%, -90%) rotate(var(--rot)); opacity: 0; } }
+    @keyframes blink { 50% { opacity: 0; } }
+    /* низкие экраны: компактнее, чтобы человечки внизу оставались видны */
+    @media (max-height: 700px) {
+      .menu { gap: 10px; padding-top: calc(14px + env(safe-area-inset-top)); }
+      .item { padding: 9px 12px; }
+      .item small { display: none; }
+      .item b { margin-bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div class="menu">
+    <div class="logo">ИГРА-ПОДАРОК<br />ПРО <span>ТВОЕГО</span> ЧЕЛОВЕКА</div>
+    <div class="sub">Его фото, его имя и ваши шутки.<br />Выбери пример и сыграй ♥</div>
+    <div class="items">
+      <a class="item" href="quiz/?order=demo"><div class="ico">🧠</div><div><b>КВИЗ</b><small>12 смешных вопросов «Насколько ты знаешь…»</small></div><span class="go">▶</span></a>
+      <a class="item" href="arcade/?order=demo"><div class="ico">🎯</div><div><b>АРКАДА</b><small>Лови подарки и пельмени, беги от понедельника</small></div><span class="go">▶</span></a>
+      <a class="item star" href="quest/?order=demo"><div class="ico">💌</div><div><b>МУЛЬТИК <span class="badge">ХИТ</span></b><small>Ваша история в 8 сценах и финал до слёз</small></div><span class="go">▶</span></a>
+    </div>
+  </div>
+  <div class="sound">🔊 ВКЛЮЧИ ЗВУК · ЖМИ НА ПРИМЕР</div>
+
+  <script>window.GIFT_ROOT = "./";</script>
+  <script src="shared/engine.js"></script>
+  <script src="quest/pixel.js"></script>
+  <script>
+    // Живой фон: сакура, двое человечков и милые сценки по кругу
+    Pix.init(document.getElementById("c"));
+    Gift.loadOrder().then(async (G) => {
+      const [hi, fi] = await Promise.all([Gift.loadImage(G.hero.photo), Gift.loadImage(G.from.photo)]);
+      Pix.setChars(Pix.makeFace(hi), G.hero.look || {}, Pix.makeFace(fi), G.from.look || {});
+      const loop = ["heart", "dance", "kiss", "laugh"];
+      let k = 0;
+      const cycle = () => {
+        Pix.setScene("sakura");
+        Pix.act("enter");
+        setTimeout(() => Pix.act(loop[k++ % loop.length]), 2600);
+        setTimeout(cycle, 9000);
+      };
+      cycle();
+    }).catch(() => {});
+  </script>
+</body>
+</html>

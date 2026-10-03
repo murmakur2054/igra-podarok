@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:," />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Квиз-подарок</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    .top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .top .avatar { width: 64px; height: 64px; border-width: 3px; box-shadow: none; transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+    .bar { flex: 1; height: 12px; background: rgba(255, 255, 255, 0.1); border-radius: 99px; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.4s ease-out; }
+    .count { font-weight: 800; color: var(--muted); font-size: 15px; min-width: 40px; text-align: right; }
+    .question { font-size: 23px; font-weight: 800; line-height: 1.3; margin: 8px 0 20px; }
+    .options { display: flex; flex-direction: column; gap: 12px; }
+    .opt {
+      text-align: left; padding: 16px 18px; border-radius: 16px; font: inherit; font-size: 17px; font-weight: 700;
+      color: var(--text); background: var(--card); border: 2px solid rgba(255, 255, 255, 0.08); cursor: pointer;
+      transition: transform 0.1s ease-out, background 0.2s, border-color 0.2s;
+    }
+    .opt:active { transform: scale(0.98); }
+    .opt.right { background: #145a43; border-color: #06d6a0; }
+    .opt.wrong { background: #5c1a2a; border-color: var(--accent); animation: shake 0.4s; }
+    .reaction { margin-top: 18px; padding: 16px; border-radius: 16px; background: rgba(255, 209, 102, 0.12); font-size: 17px; font-weight: 700; line-height: 1.4; }
+    .next { margin-top: auto; align-self: center; }
+    .face-react { position: fixed; left: 50%; top: 40%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; object-fit: cover; pointer-events: none; z-index: 50; opacity: 0; }
+    .face-react.go-wrong { animation: faceWrong 1.1s ease-out both; }
+    .face-react.go-right { animation: faceRight 1.1s ease-out both; }
+    .note { font-size: 18px; font-weight: 800; color: #ffd1dc; line-height: 1.45; padding: 14px 16px; border-radius: 18px; background: rgba(255, 77, 109, 0.14); border: 2px solid rgba(255, 143, 171, 0.4); animation-delay: 1.4s; }
+    .heart-rain { position: fixed; top: -40px; z-index: 40; pointer-events: none; animation: heartFall linear forwards; }
+    @keyframes heartFall { to { transform: translateY(115vh) rotate(25deg); } }
+    #result { overflow-y: auto; justify-content: safe center; }
+    #game { overflow-y: auto; }
+    @media (max-height: 700px) { .question { font-size: 19px; margin: 4px 0 14px; } .opt { padding: 12px 14px; font-size: 15px; } .options { gap: 9px; } .reaction { margin-top: 12px; padding: 12px; font-size: 15px; } .score-big { font-size: 48px; } .pair .avatar { width: 84px; height: 84px; } .avatar { width: 110px; height: 110px; } }
+    .score-big { font-size: 64px; font-weight: 900; color: var(--accent2); line-height: 1; }
+    .pair { display: flex; align-items: center; }
+    .pair .avatar { width: 110px; height: 110px; }
+    .pair .avatar + .avatar { margin-left: -24px; border-color: var(--accent); }
+    @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+    @keyframes faceWrong {
+      0% { opacity: 0; transform: scale(0.2) rotate(0); }
+      25% { opacity: 1; transform: scale(1.3) rotate(-15deg); filter: hue-rotate(-40deg) saturate(2); }
+      50% { transform: scale(1.1, 0.8) rotate(10deg); }
+      100% { opacity: 0; transform: scale(0.1) rotate(360deg) translateY(200px); }
+    }
+    @keyframes faceRight {
+      0% { opacity: 0; transform: scale(0.2); }
+      30% { opacity: 1; transform: scale(1.2) rotate(8deg); }
+      60% { transform: scale(1) rotate(-8deg); }
+      100% { opacity: 0; transform: scale(1.6) translateY(-260px); }
+    }
+  </style>
+</head>
+<body>
+  <div id="start" class="screen center">
+    <img class="avatar wobble" id="startPhoto" alt="" />
+    <h1 id="startTitle"></h1>
+    <p id="startText"></p>
+    <button class="btn pink" id="startBtn">Начать</button>
+  </div>
+
+  <div id="game" class="screen hidden">
+    <div class="top">
+      <img class="avatar" id="miniPhoto" alt="" />
+      <div class="bar"><i id="bar"></i></div>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="question" id="question"></div>
+    <div class="options" id="options"></div>
+    <div class="reaction hidden" id="reaction"></div>
+    <button class="btn next hidden" id="nextBtn">Дальше →</button>
+  </div>
+
+  <div id="result" class="screen center hidden">
+    <div class="pair"><img class="avatar" id="resHero" alt="" /><img class="avatar" id="resFrom" alt="" /></div>
+    <div class="score-big" id="score"></div>
+    <h2 id="resTitle"></h2>
+    <p id="resText"></p>
+    <h1 class="fade-up" id="occasion" style="color: var(--accent2); animation-delay: 0.6s"></h1>
+    <p class="note fade-up hidden" id="note"></p>
+    <button class="btn" id="againBtn">Пройти ещё раз</button>
+  </div>
+
+  <img class="face-react" id="faceReact" alt="" />
+
+  <script src="../shared/engine.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let G, i = 0, score = 0, answered = false;
+
+    Gift.loadOrder().then((cfg) => {
+      G = cfg;
+      const photo = Gift.asset(G.hero.photo);
+      ["startPhoto", "miniPhoto", "resHero", "faceReact"].forEach((id) => ($(id).src = photo));
+      $("resFrom").src = Gift.asset(G.from.photo);
+      $("startTitle").textContent = G.quiz.title;
+      $("startText").textContent = G.quiz.questions.length + " вопросов. Отвечай честно — " + G.hero.name + " всё видит 👀";
+      document.title = G.quiz.title;
+    }).catch((e) => Gift.showError(e.message));
+
+    $("startBtn").onclick = () => {
+      Gift.sfx.boing();
+      $("start").classList.add("hidden");
+      $("game").classList.remove("hidden");
+      i = 0; score = 0;
+      render();
+    };
+
+    function render() {
+      const q = G.quiz.questions[i];
+      answered = false;
+      $("count").textContent = i + 1 + "/" + G.quiz.questions.length;
+      $("bar").style.width = (i / G.quiz.questions.length) * 100 + "%";
+      $("question").textContent = q.q;
+      $("question").className = "question fade-up";
+      $("reaction").classList.add("hidden");
+      $("nextBtn").classList.add("hidden");
+      $("options").innerHTML = "";
+      q.options.forEach((text, idx) => {
+        const b = document.createElement("button");
+        b.className = "opt fade-up";
+        b.style.animationDelay = idx * 0.06 + "s";
+        b.textContent = text;
+        b.onclick = () => choose(idx, b);
+        $("options").appendChild(b);
+      });
+    }
+
+    function choose(idx, btn) {
+      if (answered) return;
+      answered = true;
+      const q = G.quiz.questions[i];
+      const ok = idx === q.answer;
+      const buttons = $("options").children;
+      buttons[q.answer].classList.add("right");
+      if (!ok) btn.classList.add("wrong");
+      if (ok) { score++; Gift.sfx.good(); } else { Gift.sfx.wrong(); }
+      // Лицо выпрыгивает на экран: радуется или улетает кувырком
+      const f = $("faceReact");
+      f.className = "face-react";
+      void f.offsetWidth;
+      f.classList.add(ok ? "go-right" : "go-wrong");
+      $("miniPhoto").style.transform = ok ? "scale(1.25) rotate(12deg)" : "scale(0.8) rotate(-180deg)";
+      setTimeout(() => ($("miniPhoto").style.transform = ""), 700);
+      const r = $("reaction");
+      r.textContent = ok ? "✅ " + q.right : "😂 " + q.wrong;
+      r.className = "reaction pop";
+      $("nextBtn").textContent = i === G.quiz.questions.length - 1 ? "Узнать результат 🎉" : "Дальше →";
+      $("nextBtn").classList.remove("hidden");
+    }
+
+    $("nextBtn").onclick = () => {
+      Gift.sfx.tap();
+      i++;
+      if (i < G.quiz.questions.length) return render();
+      showResult();
+    };
+
+    function showResult() {
+      $("game").classList.add("hidden");
+      $("result").classList.remove("hidden");
+      const total = G.quiz.questions.length;
+      const res = [...G.quiz.results].reverse().find((r) => score >= r.min);
+      $("score").textContent = score + " из " + total;
+      $("score").className = "score-big pop";
+      $("resTitle").textContent = res.title;
+      $("resText").textContent = res.text;
+      $("occasion").textContent = G.occasion + " 🎂";
+      Gift.sfx.win();
+      Gift.confetti(120);
+      if (G.quiz.finalNote) { $("note").textContent = G.quiz.finalNote; $("note").classList.remove("hidden"); }
+      for (let k = 0; k < 40; k++) setTimeout(() => {
+        const h = document.createElement("div");
+        h.className = "heart-rain";
+        h.textContent = ["❤️", "💖", "💕", "💗"][k % 4];
+        h.style.left = Math.random() * 100 + "vw";
+        h.style.fontSize = 18 + Math.random() * 22 + "px";
+        h.style.animationDuration = 3 + Math.random() * 3 + "s";
+        document.body.appendChild(h);
+        setTimeout(() => h.remove(), 6500);
+      }, 1200 + k * 120);
+    }
+
+    $("againBtn").onclick = () => {
+      $("result").classList.add("hidden");
+      $("start").classList.remove("hidden");
+    };
+  </script>
+</body>
+</html>

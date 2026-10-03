@@ -1,0 +1,97 @@
+/* Пиксельный шрифт Press Start 2P (Google Fonts, лицензия OFL), лежат локально — не зависят от доступа к Google */
+@font-face { font-family: "Press Start 2P"; font-display: swap; src: url(fonts/ps2p-cyr.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Press Start 2P"; font-display: swap; src: url(fonts/ps2p-lat.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #1b1030;
+  --card: #2a1a48;
+  --accent: #ff4d6d;
+  --accent2: #ffd166;
+  --text: #fff7ec;
+  --muted: #c9b8e8;
+}
+
+html, body {
+  height: 100%;
+  background: radial-gradient(circle at 50% 0%, #3a1f66 0%, var(--bg) 70%);
+  color: var(--text);
+  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+a, button { touch-action: manipulation; }
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin: 0 auto;
+}
+.center { align-items: center; justify-content: center; text-align: center; gap: 16px; }
+.hidden { display: none !important; }
+
+h1 { font-size: 30px; line-height: 1.15; font-weight: 900; }
+h2 { font-size: 24px; line-height: 1.2; font-weight: 800; }
+p { font-size: 17px; line-height: 1.45; color: var(--muted); }
+
+.avatar {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 5px solid var(--accent2);
+  box-shadow: 0 0 0 6px rgba(255, 209, 102, 0.2), 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+.avatar.wobble { animation: wobble 2.4s ease-in-out infinite; }
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: 18px;
+  padding: 16px 22px;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2b1300;
+  background: linear-gradient(180deg, #ffe08a, var(--accent2));
+  box-shadow: 0 5px 0 #c9901f, 0 10px 24px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+  width: 100%;
+  max-width: 360px;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #c9901f, 0 4px 12px rgba(0, 0, 0, 0.3); }
+.btn.pink { color: #fff; background: linear-gradient(180deg, #ff7790, var(--accent)); box-shadow: 0 5px 0 #b3203d, 0 10px 24px rgba(0, 0, 0, 0.3); }
+.btn.ghost { background: rgba(255, 255, 255, 0.08); color: var(--text); box-shadow: none; border: 2px solid rgba(255, 255, 255, 0.18); }
+
+.confetti {
+  position: fixed;
+  top: -12px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  z-index: 999;
+  pointer-events: none;
+  animation: fall linear forwards;
+}
+
+@keyframes fall { to { top: 110vh; transform: rotate(720deg) translateX(40px); } }
+@keyframes wobble { 0%, 100% { transform: rotate(-4deg) scale(1); } 50% { transform: rotate(4deg) scale(1.05); } }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.pop { animation: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.fade-up { animation: fadeUp 0.5s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.wobble, .pop, .fade-up { animation: none; }
+}

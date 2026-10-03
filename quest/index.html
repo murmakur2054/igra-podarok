@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="data:," />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Наша история</title>
+  <link rel="stylesheet" href="../shared/style.css" />
+  <style>
+    body { background: #000; font-family: "Press Start 2P", monospace; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+    .px-box {
+      background: #1a1030; color: #fff7ec;
+      box-shadow: 0 -4px 0 #fff, 0 4px 0 #fff, -4px 0 0 #fff, 4px 0 0 #fff, 0 -8px 0 #1a1030, 0 8px 0 #1a1030, -8px 0 0 #1a1030, 8px 0 0 #1a1030, 0 12px 0 rgba(0, 0, 0, 0.35);
+    }
+    .box { position: fixed; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(88vw, 470px); min-height: 128px; padding: 16px 18px 34px; z-index: 5; cursor: pointer; }
+    .box .who { position: absolute; top: -26px; left: 6px; padding: 4px 10px; font-family: "Press Start 2P", monospace; font-size: 10px; background: #ff4d6d; color: #fff; }
+    .box p { color: #fff7ec; font-size: 13px; line-height: 1.8; min-height: 48px; }
+    .box .tap { position: absolute; right: 14px; bottom: 8px; font-size: 18px; color: #ffd166; animation: blink 0.8s steps(2) infinite; }
+    .choices { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .choices button { font: inherit; font-size: 12px; line-height: 1.6; padding: 10px 14px; background: #2e1d55; color: #fff; border: none; cursor: pointer; text-align: left; box-shadow: 0 0 0 3px #ffd166; }
+    .choices button::before { content: "▶ "; color: #ffd166; }
+    .choices button:active { transform: translateY(2px); }
+
+    .card { position: fixed; inset: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; background: rgba(10, 6, 20, 0.88); opacity: 0; pointer-events: none; transition: opacity 0.5s steps(5); }
+    .card.on { opacity: 1; }
+    .card .num { font-family: "Press Start 2P", monospace; font-size: 14px; color: #ffd166; letter-spacing: 2px; }
+    .card .name { font-family: "Press Start 2P", monospace; font-size: clamp(16px, 5vw, 24px); color: #fff; line-height: 1.5; padding: 0 20px; text-shadow: 4px 4px 0 #ff4d6d; }
+    .card .hearts { font-size: 22px; letter-spacing: 6px; color: #ff4d6d; animation: blink 0.8s steps(2) infinite; }
+    #fade { position: fixed; inset: 0; background: #000; z-index: 9; opacity: 1; pointer-events: none; transition: opacity 0.9s steps(6); }
+
+    #start { z-index: 10; background: rgba(10, 6, 20, 0.7); max-width: none; }
+    #start h1 { font-family: "Press Start 2P", monospace; font-size: clamp(18px, 6vw, 26px); line-height: 1.5; text-shadow: 4px 4px 0 #ff4d6d; }
+    #start p { font-size: 12px; line-height: 1.8; color: #e6dcff; }
+    .px-btn { font-family: "Press Start 2P", monospace; font-size: 14px; padding: 16px 22px; border: none; color: #1a1030; background: #ffd166; cursor: pointer; box-shadow: 0 -4px 0 #fff3b0 inset, 0 -4px 0 #1a1030, 0 4px 0 #1a1030, -4px 0 0 #1a1030, 4px 0 0 #1a1030, 0 8px 0 #c9901f; }
+    .px-btn:active { transform: translateY(4px); }
+    .faces { display: flex; gap: 14px; }
+    .faces img { width: 84px; height: 84px; image-rendering: pixelated; box-shadow: 0 0 0 4px #1a1030, 0 0 0 8px #fff; }
+
+    #fin { position: fixed; left: 0; right: 0; bottom: calc(5vh + env(safe-area-inset-bottom)); z-index: 6; text-align: center; padding: 0 22px; pointer-events: none; }
+    .fin-line { font-size: clamp(14px, 4.2vw, 19px); line-height: 1.8; color: #ffe9ef; min-height: 3.6em; opacity: 0; transition: opacity 1.4s ease; text-shadow: 0 0 18px rgba(255, 120, 160, 0.6), 3px 3px 0 #2b0b2b; }
+    .fin-line.on { opacity: 1; }
+    .fin-sign { font-family: "Press Start 2P", monospace; font-size: 14px; color: #ff8fab; margin-top: 8px; opacity: 0; transition: opacity 2.5s; line-height: 1.6; }
+    .fin-sign.on { opacity: 1; }
+    #replay { margin-top: 18px; opacity: 0; transition: opacity 2s; pointer-events: auto; }
+    #replay.on { opacity: 1; }
+    .comic { position: fixed; z-index: 7; transform: translate(-50%, -50%) rotate(var(--rot)); font-family: "Press Start 2P", monospace; pointer-events: none; white-space: nowrap;
+      text-shadow: 3px 3px 0 #1a1030, -2px -2px 0 #1a1030, 2px -2px 0 #1a1030, -2px 2px 0 #1a1030, 0 0 14px rgba(0,0,0,0.4); animation: comic 1.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) forwards; }
+    @keyframes comic { 0% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(0.2); opacity: 0; } 15% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1.25); opacity: 1; } 30% { transform: translate(-50%, -50%) rotate(var(--rot)) scale(1); } 80% { opacity: 1; } 100% { transform: translate(-50%, -90%) rotate(var(--rot)) scale(1); opacity: 0; } }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (max-width: 360px) { .box p { font-size: 11px; } .choices button { font-size: 11px; } .box { padding: 14px 14px 30px; } }
+    @media (max-height: 640px) { .box { min-height: 104px; } .faces img { width: 64px; height: 64px; } }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="fade"></div>
+
+  <div id="start" class="screen center">
+    <div class="faces"><img id="sHero" alt="" /><img id="sFrom" alt="" /></div>
+    <h1 id="sTitle"></h1>
+    <p>Включи звук 🔊 и найди пару спокойных минут</p>
+    <button class="px-btn" id="startBtn">▶ НАЧАТЬ</button>
+  </div>
+
+  <div class="card" id="card"><div class="num" id="cardNum"></div><div class="name" id="cardName"></div><div class="hearts">♥ ♥ ♥</div></div>
+
+  <div class="box px-box hidden" id="box">
+    <div class="who" id="who"></div>
+    <p id="text"></p>
+    <div class="choices" id="choices"></div>
+    <span class="tap" id="tap">▼</span>
+  </div>
+
+  <div id="fin" class="hidden">
+    <div class="fin-line" id="finLine"></div>
+    <div class="fin-sign" id="finSign"></div>
+    <button class="px-btn" id="replay">↺ ЕЩЁ РАЗ</button>
+  </div>
+
+  <script src="../shared/engine.js"></script>
+  <script src="pixel.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    let G, chapterIdx = 0, lineIdx = 0, typing = null, waitingChoice = false, busy = true, inFinale = false;
+
+    Pix.init($("c"));
+
+    Gift.loadOrder().then(async (cfg) => {
+      G = cfg;
+      const [hi, fi] = await Promise.all([Gift.loadImage(G.hero.photo), Gift.loadImage(G.from.photo)]);
+      const fa = Pix.makeFace(hi), fb = Pix.makeFace(fi);
+      Pix.setChars(fa, G.hero.look || {}, fb, G.from.look || {});
+      try { $("sHero").src = fa.toDataURL(); $("sFrom").src = fb.toDataURL(); }
+      catch (e) { $("sHero").src = Gift.asset(G.hero.photo); $("sFrom").src = Gift.asset(G.from.photo); }
+      $("sTitle").textContent = G.quest.title;
+      document.title = G.quest.title;
+      Pix.setScene("park");
+      Pix.act("enter");
+      $("fade").style.opacity = 0.35;
+    }).catch((e) => Gift.showError(e.message));
+
+    $("startBtn").onclick = () => {
+      Gift.audio();
+      Gift.music.swell = 0;
+      Gift.music.start();
+      $("start").classList.add("hidden");
+      openChapter(0);
+    };
+
+    async function openChapter(i) {
+      busy = true;
+      chapterIdx = i; lineIdx = 0;
+      const ch = G.quest.chapters[i];
+      $("box").classList.add("hidden");
+      $("fade").style.opacity = 1;
+      await wait(950);
+      Pix.setScene(ch.scene);
+      $("cardNum").textContent = "ГЛАВА " + (i + 1);
+      $("cardName").textContent = ch.title || "";
+      $("card").classList.add("on");
+      $("fade").style.opacity = 0;
+      Gift.sfx.win();
+      await wait(2100);
+      $("card").classList.remove("on");
+      await wait(400);
+      $("box").classList.remove("hidden");
+      busy = false;
+      showLine();
+    }
+
+    const lineOf = (l) => (typeof l === "string" ? { t: l } : l);
+
+    function typeText(str) {
+      clearInterval(typing);
+      const el = $("text");
+      el.textContent = "";
+      let k = 0;
+      $("tap").classList.add("hidden");
+      typing = setInterval(() => {
+        el.textContent = str.slice(0, ++k);
+        if (k % 3 === 0 && str[k - 1] !== " ") Gift.sfx.blip();
+        if (k >= str.length) { clearInterval(typing); typing = null; $("tap").classList.remove("hidden"); }
+      }, 34);
+    }
+
+    function showLine() {
+      $("choices").innerHTML = "";
+      const l = lineOf(G.quest.chapters[chapterIdx].lines[lineIdx]);
+      $("who").textContent = l.who || "♥ " + G.quest.title.toUpperCase();
+      if (l.act) Pix.act(l.act);
+      typeText(l.t);
+    }
+
+    $("box").onclick = () => {
+      if (busy || waitingChoice || inFinale) return;
+      const ch = G.quest.chapters[chapterIdx];
+      if (typing) { clearInterval(typing); typing = null; $("text").textContent = currentText(); $("tap").classList.remove("hidden"); return; }
+      Gift.sfx.tap();
+      lineIdx++;
+      if (lineIdx < ch.lines.length) return showLine();
+      if (ch.choice && lineIdx === ch.lines.length) return askChoice(ch.choice);
+      nextChapter();
+    };
+
+    function currentText() {
+      const ch = G.quest.chapters[chapterIdx];
+      return lineIdx < ch.lines.length ? lineOf(ch.lines[lineIdx]).t : ch.choice.reply;
+    }
+
+    function askChoice(choice) {
+      waitingChoice = true;
+      typeText(choice.q);
+      $("tap").classList.add("hidden");
+      setTimeout(() => {
+        choice.options.forEach((o) => {
+          const b = document.createElement("button");
+          b.textContent = o;
+          b.onclick = (e) => {
+            e.stopPropagation();
+            Gift.sfx.good();
+            $("choices").innerHTML = "";
+            waitingChoice = false;
+            if (choice.act) Pix.act(choice.act);
+            typeText(choice.reply);
+          };
+          $("choices").appendChild(b);
+        });
+      }, 600);
+    }
+
+    function nextChapter() {
+      if (chapterIdx + 1 < G.quest.chapters.length) {
+        Gift.music.swell = Math.min(0.6, (chapterIdx + 1) * 0.1);
+        return openChapter(chapterIdx + 1);
+      }
+      startFinale();
+    }
+
+    // ---------- ТРОГАТЕЛЬНЫЙ ФИНАЛ ----------
+    async function startFinale() {
+      inFinale = true;
+      $("box").classList.add("hidden");
+      $("fade").style.opacity = 1;
+      await wait(1600);
+      Pix.setScene("finale");
+      Pix.act("finaleEnter");
+      Gift.music.swell = 0.8;
+      $("fade").style.opacity = 0;
+      $("fin").classList.remove("hidden");
+      await wait(6500);
+
+      const lines = G.quest.finale;
+      for (let i = 0; i < lines.length; i++) {
+        const el = $("finLine");
+        el.textContent = lines[i];
+        el.classList.add("on");
+        if (i === lines.length - 3) { Gift.music.swell = 1; Pix.fireworks = true; }
+        await wait(Math.max(3400, lines[i].length * 100));
+        if (i < lines.length - 1) { el.classList.remove("on"); await wait(1500); }
+      }
+      Pix.act("finaleKiss");
+      await wait(3800);
+      Pix.act("heartSky");
+      await wait(3500);
+      $("finSign").textContent = G.quest.signature;
+      $("finSign").classList.add("on");
+      await wait(4000);
+      $("replay").classList.add("on");
+      setTimeout(() => { Pix.fireworks = false; Gift.music.stop(8); }, 12000);
+    }
+
+    $("replay").onclick = () => location.reload();
+  </script>
+</body>
+</html>
