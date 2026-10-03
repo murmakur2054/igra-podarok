@@ -5,7 +5,7 @@
   <link rel="icon" href="data:," />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Наша история</title>
-  <link rel="stylesheet" href="../shared/style.css?v=20261003211951" />
+  <link rel="stylesheet" href="../shared/style.css?v=20261003213316" />
   <style>
     body { background: #000; font-family: "Press Start 2P", monospace; }
     canvas { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
@@ -50,6 +50,7 @@
     @keyframes blink { 50% { opacity: 0; } }
     @media (max-width: 360px) { .box p { font-size: 11px; } .choices button { font-size: 11px; } .box { padding: 14px 14px 30px; } }
     @media (max-height: 640px) { .box { min-height: 104px; } .faces img { width: 64px; height: 64px; } }
+    .back { bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
   </style>
 </head>
 <body>
@@ -78,8 +79,9 @@
     <button class="px-btn" id="replay">↺ ЕЩЁ РАЗ</button>
   </div>
 
-  <script src="../shared/engine.js?v=20261003211951"></script>
-  <script src="pixel.js?v=20261003211951"></script>
+  <script src="../shared/engine.js?v=20261003213316"></script>
+  <script>Gift.backButton();</script>
+  <script src="pixel.js?v=20261003213316"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));

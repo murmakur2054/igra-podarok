@@ -104,3 +104,12 @@ p { font-size: 17px; line-height: 1.45; color: var(--muted); }
   box-shadow: 0 -3px 0 #fff, 0 3px 0 #fff, -3px 0 0 #fff, 3px 0 0 #fff;
 }
 .snd:active { transform: translateY(2px); }
+
+/* Пиксельная кнопка «назад к примерам» (только в демо) */
+.back {
+  position: fixed; z-index: 60; bottom: calc(12px + env(safe-area-inset-bottom)); left: calc(12px + env(safe-area-inset-left));
+  height: 40px; padding: 0 12px; display: flex; align-items: center; gap: 6px; text-decoration: none;
+  font-family: "Press Start 2P", monospace; font-size: 10px; color: #fff; background: rgba(26, 16, 48, 0.88); touch-action: manipulation;
+  box-shadow: 0 -3px 0 #fff, 0 3px 0 #fff, -3px 0 0 #fff, 3px 0 0 #fff;
+}
+.back:active { transform: translateY(2px); }

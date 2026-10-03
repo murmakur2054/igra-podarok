@@ -324,5 +324,15 @@
     document.body.innerHTML = '<div class="screen center"><h2>Ой 😅</h2><p>' + msg + "</p></div>";
   }
 
-  window.Gift = { loadOrder, asset, loadImage, audio, sfx, music, soundButton, confetti, showError, orderId };
+  // Кнопка «назад» к списку примеров — только в демо, у заказчиков её нет
+  function backButton() {
+    if (orderId !== "demo") return;
+    const a = document.createElement("a");
+    a.className = "back";
+    a.href = (window.GIFT_ROOT || "../") + "index.html";
+    a.textContent = "◀ НАЗАД";
+    document.body.appendChild(a);
+  }
+
+  window.Gift = { loadOrder, asset, loadImage, audio, sfx, music, soundButton, backButton, confetti, showError, orderId };
 })();
