@@ -8,7 +8,7 @@
   function loadOrder() {
     return new Promise((resolve, reject) => {
       const s = document.createElement("script");
-      s.src = base + "config.js";
+      s.src = base + "config.js?t=" + Date.now();   // всегда свежий заказ
       s.onload = () => (window.GIFT ? resolve(window.GIFT) : reject(new Error("config пустой")));
       s.onerror = () => reject(new Error("Заказ «" + orderId + "» не найден"));
       document.head.appendChild(s);
