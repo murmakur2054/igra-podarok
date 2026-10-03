@@ -9,6 +9,7 @@
   <style>
     canvas { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
     .hud { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; font-weight: 900; font-size: 22px; pointer-events: none; z-index: 5; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
+    .snd { bottom: auto; top: calc(56px + env(safe-area-inset-top)); }
     .combo { position: fixed; top: calc(52px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-family: "Press Start 2P", monospace; font-size: 14px; color: var(--accent2); z-index: 5; pointer-events: none; text-shadow: 3px 3px 0 #1a1030; }
     .overlay { background: rgba(27, 16, 48, 0.88); z-index: 10; max-width: none; }
     .overlay > * { max-width: 420px; }
@@ -341,8 +342,11 @@
       cx.restore();
     }
 
+    const snd = Gift.soundButton("arcade");
     function start() {
       Gift.sfx.boing();
+      Gift.music.start("arcade");
+      snd.refresh();
       reset();
       state = "play";
       $("start").classList.add("hidden");

@@ -99,8 +99,11 @@
       document.title = G.quiz.title;
     }).catch((e) => Gift.showError(e.message));
 
+    const snd = Gift.soundButton("fun");
     $("startBtn").onclick = () => {
       Gift.sfx.boing();
+      Gift.music.start("fun");
+      snd.refresh();
       $("start").classList.add("hidden");
       $("game").classList.remove("hidden");
       i = 0; score = 0;

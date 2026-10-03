@@ -58,7 +58,7 @@
       <a class="item star" href="quest/?order=demo"><div class="ico">💌</div><div><b>МУЛЬТИК <span class="badge">ХИТ</span></b><small>Ваша история в 8 сценах и финал до слёз</small></div><span class="go">▶</span></a>
     </div>
   </div>
-  <div class="sound">🔊 ВКЛЮЧИ ЗВУК · ЖМИ НА ПРИМЕР</div>
+  <div class="sound">СО ЗВУКОМ ВОЛШЕБНЕЕ ♥</div>
 
   <script>window.GIFT_ROOT = "./";</script>
   <script src="shared/engine.js"></script>
@@ -66,6 +66,10 @@
   <script>
     // Живой фон: сакура, двое человечков и милые сценки по кругу
     Pix.init(document.getElementById("c"));
+    const snd = Gift.soundButton("love");
+    Gift.music.swell = 0.3;
+    const wake = (e) => { if (e.target.closest(".snd")) return; document.removeEventListener("pointerdown", wake); Gift.music.start("love"); snd.refresh(); };
+    document.addEventListener("pointerdown", wake);
     Gift.loadOrder().then(async (G) => {
       const [hi, fi] = await Promise.all([Gift.loadImage(G.hero.photo), Gift.loadImage(G.from.photo)]);
       Pix.setChars(Pix.makeFace(hi), G.hero.look || {}, Pix.makeFace(fi), G.from.look || {});

@@ -37,7 +37,7 @@
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain();
-      master.gain.value = 0.8;
+      master.gain.value = vol();
       master.connect(ctx.destination);
       reverb = makeReverb(3.2);
       const wet = ctx.createGain();
@@ -156,21 +156,105 @@
     { bass: "G2", chord: ["G3", "B3", "D4"], melody: ["D5", "B4", "G4", "B4"] },
   ];
 
+  // ---------------- 8-БИТНАЯ МУЗЫКА (квиз, аркада) ----------------
+  // Мелодия — 8 восьмых на такт, "-" — пауза.
+  const CHIP = {
+    // квиз: весёлая прыгучая, до мажор
+    fun: { bpm: 128, lead: "square", bars: [
+      { root: "C3", mel: ["E5", "-", "G5", "E5", "C5", "-", "D5", "E5"] },
+      { root: "A2", mel: ["C5", "-", "E5", "C5", "A4", "-", "B4", "C5"] },
+      { root: "F2", mel: ["A4", "-", "C5", "A4", "F4", "-", "G4", "A4"] },
+      { root: "G2", mel: ["B4", "D5", "G5", "-", "F5", "D5", "B4", "G4"] },
+    ] },
+    // аркада: быстрая и бодрая, ля минор
+    arcade: { bpm: 152, lead: "square", bars: [
+      { root: "A2", mel: ["A4", "C5", "E5", "A5", "G5", "E5", "C5", "E5"] },
+      { root: "F2", mel: ["F4", "A4", "C5", "F5", "E5", "C5", "A4", "C5"] },
+      { root: "C3", mel: ["G4", "C5", "E5", "G5", "F5", "E5", "D5", "E5"] },
+      { root: "G2", mel: ["B4", "D5", "G5", "B5", "A5", "G5", "F5", "D5"] },
+    ] },
+  };
+
+  let noiseBuf = null;
+  function drum(kind, t) {
+    const a = audio();
+    if (kind === "kick") {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = "sine";
+      o.frequency.setValueAtTime(150, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.3, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + 0.2);
+      return;
+    }
+    if (!noiseBuf) {
+      noiseBuf = a.createBuffer(1, a.sampleRate * 0.3, a.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const s = a.createBufferSource();
+    const f = a.createBiquadFilter();
+    const g = a.createGain();
+    const dur = kind === "snare" ? 0.14 : 0.04;
+    s.buffer = noiseBuf;
+    f.type = "highpass";
+    f.frequency.value = kind === "snare" ? 1500 : 7000;
+    g.gain.setValueAtTime(kind === "snare" ? 0.09 : 0.035, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(master);
+    s.start(t);
+    s.stop(t + dur + 0.02);
+  }
+
+  function chipBar(st, b, t, loop) {
+    const e = 60 / st.bpm / 2;   // восьмая
+    for (let i = 0; i < 8; i++) {
+      const at = t + i * e;
+      // бас «умпа»: корень / октава
+      tone({ freq: hz(b.root) * (i % 2 ? 2 : 1), type: "triangle", dur: e * 0.9, vol: 0.13, when: at - audio().currentTime });
+      const n = b.mel[i];
+      // на первом круге мелодия тише — разгон
+      if (n !== "-") tone({ freq: hz(n), type: st.lead, dur: e * 0.85, vol: loop ? 0.035 : 0.022, when: at - audio().currentTime });
+      if (i % 4 === 0) drum("kick", at);
+      if (i % 4 === 2) drum("snare", at);
+      drum("hat", at + e / 2);
+    }
+    return e * 8;
+  }
+
   let musicTimer = null;
-  let musicStop = false;
+  let musicStop = true;
+  let muted = false;
+  const vol = () => (muted ? 0.0001 : 0.8);
 
   // swell: 0..1 — насколько «раскрываются» струнные (растёт к кульминации)
+  // style: "love" — фортепиано (история, главная), "fun" — квиз, "arcade" — аркада
   const music = {
     swell: 0,
-    start() {
+    playing: false,
+    start(style = "love") {
+      if (music.playing) return;
       const a = audio();
       musicStop = false;
+      music.playing = true;
+      master.gain.cancelScheduledValues(a.currentTime);
+      master.gain.setValueAtTime(vol(), a.currentTime);
+      const st = CHIP[style];
       const beat = 60 / 64;
       let bar = 0;
       let next = a.currentTime + 0.2;
       const schedule = () => {
         if (musicStop) return;
         while (next < a.currentTime + 1.5) {
+          if (st) {
+            next += chipBar(st, st.bars[bar % 4], next, bar >= 4);
+            bar++;
+            continue;
+          }
           const p = PROGRESSION[bar % 4];
           const loop = Math.floor(bar / 4);
           piano(hz(p.bass), next, 0.22, beat * 4);
@@ -189,15 +273,36 @@
     },
     stop(fade = 2) {
       musicStop = true;
+      music.playing = false;
       clearTimeout(musicTimer);
       if (master) {
         const t = ctx.currentTime;
         master.gain.setValueAtTime(master.gain.value, t);
         master.gain.linearRampToValueAtTime(0.0001, t + fade);
-        setTimeout(() => master && (master.gain.value = 0.8), fade * 1000 + 100);
+        setTimeout(() => master && (master.gain.value = vol()), fade * 1000 + 100);
       }
     },
   };
+
+  // Пиксельная кнопка звука в углу. Первое нажатие включает музыку, дальше — вкл/выкл.
+  function soundButton(style) {
+    const b = document.createElement("button");
+    b.className = "snd";
+    const paint = () => (b.textContent = music.playing && !muted ? "🔊" : "🔇");
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (!music.playing) { muted = false; music.start(style); }
+      else {
+        muted = !muted;
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setValueAtTime(vol(), ctx.currentTime);
+      }
+      paint();
+    };
+    document.body.appendChild(b);
+    paint();
+    return { refresh: paint };
+  }
 
   // ---------------- МЕЛОЧИ ----------------
   function confetti(count = 80) {
@@ -219,5 +324,5 @@
     document.body.innerHTML = '<div class="screen center"><h2>Ой 😅</h2><p>' + msg + "</p></div>";
   }
 
-  window.Gift = { loadOrder, asset, loadImage, audio, sfx, music, confetti, showError, orderId };
+  window.Gift = { loadOrder, asset, loadImage, audio, sfx, music, soundButton, confetti, showError, orderId };
 })();

@@ -95,3 +95,12 @@ p { font-size: 17px; line-height: 1.45; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   .avatar.wobble, .pop, .fade-up { animation: none; }
 }
+
+/* Пиксельная кнопка звука */
+.snd {
+  position: fixed; z-index: 60; bottom: calc(12px + env(safe-area-inset-bottom)); right: calc(12px + env(safe-area-inset-right));
+  width: 40px; height: 40px; padding: 0; border: none; font-size: 18px; line-height: 40px; text-align: center; cursor: pointer;
+  background: rgba(26, 16, 48, 0.88); touch-action: manipulation;
+  box-shadow: 0 -3px 0 #fff, 0 3px 0 #fff, -3px 0 0 #fff, 3px 0 0 #fff;
+}
+.snd:active { transform: translateY(2px); }
