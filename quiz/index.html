@@ -50,9 +50,11 @@
       60% { transform: scale(1) rotate(-8deg); }
       100% { opacity: 0; transform: scale(1.6) translateY(-260px); }
     }
+    #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0.55; image-rendering: pixelated; image-rendering: crisp-edges; }
   </style>
 </head>
 <body>
+  <canvas id="bg"></canvas>
   <div id="start" class="screen center">
     <img class="avatar wobble" id="startPhoto" alt="" />
     <h1 id="startTitle"></h1>
@@ -85,6 +87,8 @@
   <img class="face-react" id="faceReact" alt="" />
 
   <script src="../shared/engine.js"></script>
+  <script src="../quest/pixel.js"></script>
+  <script>Pix.init(document.getElementById("bg")); Pix.setScene("sakura");</script>
   <script>
     const $ = (id) => document.getElementById(id);
     let G, i = 0, score = 0, answered = false;

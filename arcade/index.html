@@ -27,9 +27,11 @@
     .vignette.on { opacity: 1; }
     .heart-rain { position: fixed; top: -40px; z-index: 6; pointer-events: none; animation: heartFall linear forwards; }
     @keyframes heartFall { to { transform: translateY(115vh) rotate(25deg); } }
+    #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0.55; image-rendering: pixelated; image-rendering: crisp-edges; }
   </style>
 </head>
 <body>
+  <canvas id="bg"></canvas>
   <canvas id="c"></canvas>
   <div class="vignette" id="vignette"></div>
   <div class="hud hidden" id="hud"><span id="score">0</span><span id="lives"></span></div>
@@ -51,6 +53,8 @@
   </div>
 
   <script src="../shared/engine.js"></script>
+  <script src="../quest/pixel.js"></script>
+  <script>Pix.init(document.getElementById("bg")); Pix.setScene("sakura");</script>
   <script>
     const $ = (id) => document.getElementById(id);
     const cv = $("c"), cx = cv.getContext("2d");
